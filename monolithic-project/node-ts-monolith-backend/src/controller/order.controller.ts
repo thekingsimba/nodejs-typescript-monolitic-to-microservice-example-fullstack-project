@@ -8,6 +8,7 @@ import Stripe from "stripe";
 import {client} from "../index";
 import {User} from "../entity/user.entity";
 import {createTransport} from "nodemailer";
+import KafkaConfig from "../temp_config/kafka-config";
 
 export const Orders = async (req: Request, res: Response) => {
     const orders = await getRepository(Order).find({
@@ -132,26 +133,39 @@ export const ConfirmOrder = async (req: Request, res: Response) => {
 
     await client.zIncrBy('rankings', order.ambassador_revenue, user.name);
 
-    const transporter = createTransport({
-        host: 'host.docker.internal',
-        port: 1025
-    });
+    //========================== REPLACED BY EMAIL MICROSERVICE ================================================
 
-    await transporter.sendMail({
-        from: 'from@example.com',
-        to: 'admin@admin.com',
-        subject: 'An order has been completed',
-        html: `Order #${order.id} with a total of $${order.total} has been completed`
-    });
+    // const transporter = createTransport({
+    //     host: 'host.docker.internal',
+    //     port: 1025
+    // });
 
-    await transporter.sendMail({
-        from: 'from@example.com',
-        to: order.ambassador_email,
-        subject: 'An order has been completed',
-        html: `You earned $${order.ambassador_revenue} from the link #${order.code}`
-    });
+    // await transporter.sendMail({
+    //     from: 'from@example.com',
+    //     to: 'admin@admin.com',
+    //     subject: 'An order has been completed',
+    //     html: `Order #${order.id} with a total of $${order.total} has been completed`
+    // });
 
-    await transporter.close();
+    // await transporter.sendMail({
+    //     from: 'from@example.com',
+    //     to: order.ambassador_email,
+    //     subject: 'An order has been completed',
+    //     html: `You earned $${order.ambassador_revenue} from the link #${order.code}`
+    // });
+
+    // await transporter.close();
+
+    // ==================================  EMAIL MICROSERVICE CALL ============================================
+
+
+    const kafkaInstance = new KafkaConfig()
+
+    kafkaInstance.produce('default', {
+        ...order,
+        total: order.total,
+        ambassador_revenue: order.ambassador_revenue
+    })
 
     res.send({
         message: 'success'

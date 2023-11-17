@@ -1,0 +1,7 @@
+version: '3'
+services:
+  email-backend:
+    build: .
+    volumes:
+      - .:/app
+    
