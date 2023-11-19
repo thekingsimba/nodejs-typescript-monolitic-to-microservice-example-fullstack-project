@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "nodemon src/index.ts",
-    "seed:users": "ts-node src/seeder/ambassador.seeder.ts"
+    "seed:users": "ts-node src/seeder/user.seeder.ts"
   },
   "keywords": [],
   "author": "",

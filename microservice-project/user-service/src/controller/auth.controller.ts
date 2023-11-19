@@ -1,9 +1,9 @@
 import {Request, Response} from "express";
 import {getRepository} from "typeorm";
-import {User} from "../entity/user.entity";
 import bcryptjs from 'bcryptjs';
-import {sign, verify} from "jsonwebtoken";
-import {Order} from "../entity/order.entity";
+import {User} from "../entity/user.entity";
+import {sign} from "jsonwebtoken";
+import {Token} from "../entity/token.entity";
 
 export const Register = async (req: Request, res: Response) => {
     const {password, password_confirm, ...body} = req.body;
@@ -17,7 +17,6 @@ export const Register = async (req: Request, res: Response) => {
     const user = await getRepository(User).save({
         ...body,
         password: await bcryptjs.hash(password, 10),
-        is_ambassador: req.path === '/api/ambassador/register'
     });
 
     delete user.password;
@@ -27,7 +26,7 @@ export const Register = async (req: Request, res: Response) => {
 
 export const Login = async (req: Request, res: Response) => {
     const user = await getRepository(User).findOne({email: req.body.email}, {
-        select: ["id", "password", "is_ambassador"]
+        select: ["id", "password"]
     });
 
     if (!user) {
@@ -42,51 +41,41 @@ export const Login = async (req: Request, res: Response) => {
         });
     }
 
-    const adminLogin = req.path === '/api/admin/login';
-
-    if (user.is_ambassador && adminLogin) {
-        return res.status(401).send({
-            message: 'unauthorized'
-        });
-    }
-
-    const token = sign({
+    const jwt = sign({
         id: user.id,
-        scope: adminLogin ? "admin" : "ambassador"
+        scope: req.body.scope
     }, process.env.SECRET_KEY);
 
-    res.cookie("jwt", token, {
-        httpOnly: true,
-        maxAge: 24 * 60 * 60 * 1000//1 day
-    })
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
 
-    res.send({
-        message: 'success'
+    await getRepository(Token).save({
+        user_id: user.id,
+        token: jwt,
+        expired_at: tomorrow
     });
+
+    res.send({jwt});
 }
 
 export const AuthenticatedUser = async (req: Request, res: Response) => {
     const user = req["user"];
 
-    if (req.path === '/api/admin/user') {
-        return res.send(user);
+    if ((req.params.scope == 'ambassador' && req["scope"] !== 'ambassador') || (req.params.scope == 'admin' && req["scope"] !== 'admin')) {
+        return res.status(401).send({
+            message: 'unauthorized'
+        });
     }
-
-    const orders = await getRepository(Order).find({
-        where: {
-            user_id: user.id,
-            complete: true
-        },
-        relations: ['order_items']
-    });
-
-    user.revenue = orders.reduce((s, o) => s + o.ambassador_revenue, 0);
 
     res.send(user);
 }
 
 export const Logout = async (req: Request, res: Response) => {
-    res.cookie("jwt", "", {maxAge: 0});
+    const user = req["user"];
+
+    await getRepository(Token).delete({
+        user_id: user['id']
+    });
 
     res.send({
         message: 'success'

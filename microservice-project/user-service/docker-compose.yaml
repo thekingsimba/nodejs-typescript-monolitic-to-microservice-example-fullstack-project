@@ -1,14 +1,20 @@
 version: '3.9'
 services:
-
   users_backend:
     build: .
-    ports:
-      - "8001:8000"
+    container_name: users_ms
+    environment:
+      DB_HOST: users_db
+      DB_PORT: 3306
+      DB_DATABASE: users
+      DB_USERNAME: root
+      DB_PASSWORD: root
     volumes:
       - .:/app
     depends_on:
       - users_db
+    networks:
+      - users
 
   users_db:
     image: mysql:8
@@ -19,6 +25,9 @@ services:
       MYSQL_ROOT_PASSWORD: root
     volumes:
       - .dbdata:/var/lib/mysql
-    ports:
-      - "3307:3306"
+    networks:
+      - users
 
+networks:
+  users:
+    name: users
